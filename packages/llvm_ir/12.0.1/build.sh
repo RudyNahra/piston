@@ -4,3 +4,4 @@ curl -L "https://github.com/llvm/llvm-project/releases/download/llvmorg-12.0.1/c
 tar xf llvm-ir.tar.xz clang+llvm-12.0.1-x86_64-linux-gnu-ubuntu-/bin --strip-components=1
 
 rm llvm-ir.tar.xz
+

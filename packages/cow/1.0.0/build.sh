@@ -10,3 +10,4 @@ g++ -o bin/cow cow/source/cow.cpp
 
 # Cleanup
 rm -rf cow
+

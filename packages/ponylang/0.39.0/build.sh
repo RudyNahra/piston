@@ -25,3 +25,4 @@ make prefix="$PREFIX" install
 
 cd ..
 rm -rf ponyc
+

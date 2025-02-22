@@ -7,3 +7,4 @@ cd bqn
 
 git checkout 88f65850fa6ac28bc50886c5942652f21d5be924
 make CC=gcc
+

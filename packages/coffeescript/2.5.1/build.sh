@@ -8,3 +8,4 @@ export PATH=$PWD/bin:$PATH
 
 # Install CoffeeScript via npm and done
 npm install --global coffeescript@2.5.1
+

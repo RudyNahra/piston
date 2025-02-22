@@ -23,3 +23,4 @@ sed -i 's|/bin/runtime/bin/java|$JAVA_RUNTIME|g' ../bin/dragon
 
 cd ../
 rm -rf build
+

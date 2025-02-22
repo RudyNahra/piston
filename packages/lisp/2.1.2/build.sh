@@ -17,3 +17,4 @@ INSTALL_ROOT=$PREFIX sh install.sh
 cd ../
 
 rm -rf build
+

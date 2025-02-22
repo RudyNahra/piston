@@ -13,3 +13,4 @@ cd emoji
 chmod +x emojicodec
 
 cd ..
+

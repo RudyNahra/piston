@@ -9,3 +9,4 @@ cp -r dart-sdk/* .
 rm -rf dart-sdk
 
 chmod -R +rx bin
+

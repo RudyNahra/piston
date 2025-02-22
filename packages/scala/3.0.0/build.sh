@@ -9,3 +9,4 @@ rm jdk.tar.gz
 curl -L "https://github.com/lampepfl/dotty/releases/download/3.0.0/scala3-3.0.0.tar.gz" -o scala.tar.gz
 tar -xzf scala.tar.gz --strip-components=1
 rm scala.tar.gz
+

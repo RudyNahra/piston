@@ -9,3 +9,4 @@ source ../../java/15.0.2/build.sh
 curl -LO "https://github.com/gaborsch/rocky/raw/master/rocky.jar"
 curl -LO "https://github.com/gaborsch/rocky/raw/master/rockstar"
 chmod +x rockstar
+

@@ -31,3 +31,4 @@ cd pure-0.68
 ./configure --prefix="$PREFIX" --enable-release --with-tool-prefix="$PREFIX/bin" --with-static-llvm
 make -j$(nproc)
 make install -j$(nproc)
+

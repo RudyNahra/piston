@@ -23,3 +23,4 @@ cp -r build/bin .
 cp -r build/lib .
 
 rm -rf build
+

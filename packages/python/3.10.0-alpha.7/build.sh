@@ -20,3 +20,4 @@ rm -rf build
 
 # This is alpha version, hence most of the libraries are not compatible with python3.10.0
 # bin/pip3 install numpy scipy pandas pycrypto whoosh bcrypt passlib
+

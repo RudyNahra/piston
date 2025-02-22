@@ -19,3 +19,4 @@ make install -j$(nproc)
 # Cleanup
 cd ..
 rm -rf build
+

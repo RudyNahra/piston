@@ -20,3 +20,4 @@ cd ../../ && rm -rf build
 # This is alpha version of python, hence most of the libraries are not compatible with python3.10.0
 # As a result, they will not be compatible with yeethon3.10 too
 # bin/pip3 install numpy scipy pandas pycrypto whoosh bcrypt passlib
+

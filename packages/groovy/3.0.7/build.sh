@@ -12,3 +12,4 @@ cd ..
 curl -L "https://groovy.jfrog.io/artifactory/dist-release-local/groovy-zips/apache-groovy-binary-3.0.7.zip" -o groovy.zip
 unzip -q groovy.zip
 rm groovy.zip
+

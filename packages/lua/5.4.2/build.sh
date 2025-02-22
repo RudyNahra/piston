@@ -12,3 +12,4 @@ make linux
 make test
 # Installing Lua
 make linux install
+

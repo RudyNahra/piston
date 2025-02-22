@@ -21,3 +21,4 @@ cd ..
 cp -r build/* bin
 
 rm -rf build
+

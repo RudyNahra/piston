@@ -30,3 +30,4 @@ make install -j$(nproc) PLATFORM="linux"
 # Remove redundant files
 cd ../../
 rm -rf build
+

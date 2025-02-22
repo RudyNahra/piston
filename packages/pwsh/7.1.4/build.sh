@@ -4,3 +4,4 @@ tar zxf powershell.tar.gz
 rm powershell.tar.gz
 
 chmod +x pwsh
+

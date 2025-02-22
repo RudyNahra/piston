@@ -41,3 +41,4 @@ rm -rf maven/
 mkdir -p bin
 mv build/clojure.jar bin
 rm -rf build
+

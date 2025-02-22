@@ -8,3 +8,4 @@ tar xf zig.tar.xz --strip-components=1
 rm zig.tar.xz
 
 cd ../
+

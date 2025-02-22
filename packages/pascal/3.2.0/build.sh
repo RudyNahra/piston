@@ -23,3 +23,4 @@ rm -rf build
 # We'll copy that into the local lib dir (fpc searches there too on compile)
 mkdir lib/fpc/etc
 cp -r /etc/fp* lib/fpc/etc/
+

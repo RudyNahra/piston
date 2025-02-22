@@ -14,3 +14,4 @@ export DOTNET_CLI_HOME=$PWD
 
 rm -rf cache_application fs_cache_application vb_cache_application
 # Get rid of it, we don't actually need the application - just the restore
+

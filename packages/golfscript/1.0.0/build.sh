@@ -8,3 +8,4 @@ curl "http://www.golfscript.com/golfscript/golfscript.rb" -o bin/golfscript.rb
 # using the shebang to run it with the right Ruby
 sed -i "s|/usr/bin/|$PWD/bin/|g" bin/golfscript.rb
 chmod +x bin/golfscript.rb
+

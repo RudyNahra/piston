@@ -16,3 +16,4 @@ rm nim.tar.xz
 cd ../
 
 rm -rf build
+
