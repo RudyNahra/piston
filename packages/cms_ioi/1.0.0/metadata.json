@@ -1,5 +1,5 @@
 {
-    "language": "cms-ioi",
+    "language": "cms_ioi",
     "version": "1.0.0",
     "aliases": ["cms", "ioi"]
 }
