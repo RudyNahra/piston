@@ -1,5 +1,14 @@
 {
     "language": "cms_ioi",
     "version": "1.0.0",
-    "aliases": ["cms", "ioi"]
+    "provides": [
+        {
+            "language": "cms",
+            "aliases": ["cms_ioi"]
+        },
+        {
+            "language": "cms_checker",
+            "aliases": ["cms_ioi_checker"]
+        }
+    ]
 }

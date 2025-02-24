@@ -96,9 +96,9 @@ files_to_compile=("graders/$problem_name.cpp")
 [ -e graders/grader.cpp ] && files_to_compile+=("graders/grader.cpp")
 [ -e graders/stub.cpp ] && files_to_compile+=("graders/stub.cpp")
 
-if [ ${#files_to_compile[@]} -gt 0 ]; then
-    g++ -DEVAL -std=gnu++17 -O2 -pipe -static -s -o "$problem_name" "${files_to_compile[@]}"
-    chmod +x "$problem_name"  # Make the problem executable
+if [ ${#files_to_compile[@]} -gt 0 ] && [ -e "graders/$problem_name.cpp" ]; then
+    g++ -DEVAL -std=gnu++17 -O2 -pipe -static -s -o graders/"$problem_name" "${files_to_compile[@]}"
+    chmod +x graders/"$problem_name"  # Make the problem executable
     echo "Compiled $problem_name from ${files_to_compile[@]} successfully"
 else
     echo "No files to compile"

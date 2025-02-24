@@ -2,4 +2,11 @@
 
 # Put instructions to run the runtime
 
-./"$@"
+./"${@%.*}"
+if [ "${PISTON_LANGUAGE}" = "cms_checker" ]; then
+    # Run checker instead of solution
+    ./checker/checker input.txt correct_output.txt output.txt
+else
+    # Run solution
+    ./"${@%.*}"
+fi
