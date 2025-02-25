@@ -1,106 +1,78 @@
 #!/bin/bash
 
 manager_files=()  # Array to store manager filenames
-
-# Define current directory
 current_dir="$(pwd)"
 
-# Checker
-checker_dir="$current_dir/checker"
-checker_src="$checker_dir/checker.cpp"
-
-if [ -e "$checker_src" ]; then
-    echo "Checker found, compiling"
-    checker_exe="$checker_dir/checker"
-    g++ -x c++ -std=gnu++17 -O2 -static -o "$checker_exe" "$checker_src"
-    chmod +x "$checker_exe"  # Make the checker executable
-    if [ $? -ne 0 ]; then
-        echo "Could not compile checker" >&2
+if [ -e "correct_output.txt" ]; then
+    echo "correct_output.txt found, checking for checker"
+    
+    # Checker compilation path
+    checker_dir="$current_dir/checker"
+    checker_src="$checker_dir/checker.cpp"
+    
+    if [ -e "$checker_src" ]; then
+        echo "Compiling checker"
+        checker_exe="$checker_dir/checker"
+        g++ -x c++ -std=gnu++17 -O2 -static -o "$checker_exe" "$checker_src"
+        chmod +x "$checker_exe"
+        if [ $? -ne 0 ]; then
+            echo "Could not compile checker" >&2
+            exit 1
+        fi
+        manager_files+=("checker")
+        echo "Manager files: ${manager_files[@]}"
+    else
+        echo "No checker found despite having correct_output.txt" >&2
         exit 1
     fi
-    # digest=$(put_file_from_path "$checker_exe" "Manager for task $name")
-    # args["managers"]['checker']="Manager('checker', '$digest')"
-    manager_files+=("checker")  # Save grader name to the array
-    evaluation_param="comparator"
 else
-    echo "Checker not found, using diff if necessary"
-    evaluation_param="diff"
-fi
-
-# Note that the original TPS worked with custom task type Batch2017
-# and Communication2017 instead of Batch and Communication.
-
-# Graders
-graders_dir="$current_dir/graders"
-
-# unsupported problem type
-# if [ "$TASK_TYPE" == "TwoSteps" ]; then
-#     pas_manager="${name}lib.pas"
-#     pas_manager_path="$graders_dir/$pas_manager"
-#     if [ ! -e "$pas_manager_path" ]; then
-#     #     digest=$(put_file_content '' "Pascal manager for task $name")
-#     #     # args["managers"][$pas_manager]="Manager('$pas_manager', '$digest')"
-#         manager_files+=("$pas_manager")  # Save grader name to the array
-#     fi
-# fi
-
-if [ ! -e "$graders_dir" ]; then
-    echo "Grader folder was not found" >&2
-    graders_list=()
-else
+    echo "No correct_output.txt found, proceeding with grader compilation"
+    
+    # Graders path
+    graders_dir="$current_dir/graders"
+    if [ ! -e "$graders_dir" ]; then
+        echo "Grader folder was not found" >&2
+        exit 1
+    fi
+    
+    # Find and compile manager if it exists
+    manager_src="$graders_dir/manager.cpp"
+    if [ -e "$manager_src" ]; then
+        echo "Compiling manager"
+        manager_exe="$graders_dir/manager"
+        g++ -x c++ -std=gnu++17 -O2 -static -o "$manager_exe" "$manager_src"
+        chmod +x "$manager_exe"
+        if [ $? -ne 0 ]; then
+            echo "Could not compile manager" >&2
+            exit 1
+        fi
+        manager_files+=("manager")
+    fi
+    
+    # Process other graders
     graders_list=($(ls "$graders_dir" | grep -v 'manager.cpp'))
-fi
-
-
-for grader_name in "${graders_list[@]}"; do
-    grader_src="$graders_dir/$grader_name"
-    # digest=$(put_file_from_path "$grader_src" "Manager for task $name")
-    # if [ "$TASK_TYPE" == "Communication" ] && [[ "$grader_name" == "grader"* ]]; then
-        # grader_name="stub${grader_name##*.}"
-    # fi
-    # args["managers"][$grader_name]="Manager('$grader_name', '$digest')"
-    manager_files+=("$grader_name")  # Save grader name to the array
-done
-
-# Manager
-manager_src="$graders_dir/manager.cpp"
-
-if [ -e "$manager_src" ]; then
-    echo "Manager found, compiling"
-    manager_exe="$graders_dir/manager"
-    g++ -x c++ -std=gnu++17 -O2 -static -o "$manager_exe" "$manager_src"
-    chmod +x "$manager_exe"  # Make the manager executable
-    if [ $? -ne 0 ]; then
-        echo "Could not compile manager" >&2
-        exit 1
-    fi
-    manager_files+=("manager")  # Save grader name to the array
-    # digest=$(put_file_from_path "$manager_exe" "Manager for task $name")
-    # args["managers"]["manager"]="Manager('manager', '$digest')"
-fi
-
-# At the end of the script, print the full list of manager files
-echo "Manager files: ${manager_files[@]}"
-
-# Extract problem name from manager_files
-problem_name='?'
-for file in "${manager_files[@]}"; do
-    if [[ "$file" == *.h && "$file" != "testlib.h" ]]; then
-        problem_name="${file%.h}"  # Remove the .h extension
-        echo "Problem name: $problem_name"
-        break  # Exit after finding the first valid .h file
-    fi
-done
-
-files_to_compile=("graders/$problem_name.cpp")
-[ -e graders/grader.cpp ] && files_to_compile+=("graders/grader.cpp")
-[ -e graders/stub.cpp ] && files_to_compile+=("graders/stub.cpp")
-
-if [ ${#files_to_compile[@]} -gt 0 ] && [ -e "graders/$problem_name.cpp" ]; then
+    for grader_name in "${graders_list[@]}"; do
+        manager_files+=("$grader_name")
+    done
+    
+    # Extract problem name and compile necessary files
+    problem_name='?'
+    for file in "${manager_files[@]}"; do
+        if [[ "$file" == *.h && "$file" != "testlib.h" ]]; then
+            problem_name="${file%.h}"
+            echo "Problem name: $problem_name"
+            break
+        fi
+    done
+    
+    files_to_compile=("graders/$problem_name.cpp")
+    [ -e graders/grader.cpp ] && files_to_compile+=("graders/grader.cpp")
+    [ -e graders/stub.cpp ] && files_to_compile+=("graders/stub.cpp")
+    
     g++ -DEVAL -std=gnu++17 -O2 -pipe -static -s -o graders/"$problem_name" "${files_to_compile[@]}"
-    chmod +x graders/"$problem_name"  # Make the problem executable
+    chmod +x graders/"$problem_name"
     echo "Compiled $problem_name from ${files_to_compile[@]} successfully"
-else
-    echo "No files to compile"
-    exit 1
+
+    
+    echo "Manager files: ${manager_files[@]}"
 fi

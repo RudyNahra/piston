@@ -1,12 +1,58 @@
 #!/usr/bin/env bash
 
-# Put instructions to run the runtime
-
-./"${@%.*}"
-if [ "${PISTON_LANGUAGE}" = "cms_checker" ]; then
-    # Run checker instead of solution
+if [ -e "correct_output.txt" ]; then
+    # Run checker
     ./checker/checker input.txt correct_output.txt output.txt
 else
-    # Run solution
-    ./"${@%.*}"
+    # Check if grader_config.json exists
+    if [ ! -f "graders/grader_config.json" ]; then
+        echo "Error: graders/grader_config.json not found" >&2
+        echo "Current directory contents:" >&2
+        find . -type f -o -type d | sed -e 's/[^-][^\/]*\//  |/g' -e 's/|\([^ ]\)/|-\1/' >&2
+        exit 1
+    fi
+    
+    # Read task type from grader_config.json
+    TASK_TYPE=$(jq -r '.task_type' graders/grader_config.json)
+    case "$TASK_TYPE" in
+        "Batch")
+            # Run solution (original batch behavior)
+            ./"${@%.*}"
+            ;;
+            
+        "Communication")
+            # Read num_processes from config
+            NUM_PROCESSES=$(jq -r '.task_type_params.task_type_parameters_Communication_num_processes' graders/grader_config.json)
+            
+            # Create FIFOs for communication
+            FIFO_DIR=$(mktemp -d)
+            
+            # Create FIFOs for each process
+            for i in $(seq 0 $((NUM_PROCESSES-1))); do
+                mkfifo "$FIFO_DIR/u${i}_to_m"
+                mkfifo "$FIFO_DIR/m_to_u${i}"
+                chmod 666 "$FIFO_DIR/u${i}_to_m" "$FIFO_DIR/m_to_u${i}"
+            done
+
+            # Start manager in background with all FIFOs as arguments
+            MANAGER_ARGS=""
+            for i in $(seq 0 $((NUM_PROCESSES-1))); do
+                MANAGER_ARGS="$MANAGER_ARGS $FIFO_DIR/u${i}_to_m $FIFO_DIR/m_to_u${i}"
+            done
+            ./graders/manager $MANAGER_ARGS &
+            
+            # Start all user processes
+            for i in $(seq 0 $((NUM_PROCESSES-1))); do
+                ./"${@%.*}" "$FIFO_DIR/m_to_u${i}" "$FIFO_DIR/u${i}_to_m" "$i" &
+            done
+
+            # Wait for all processes to finish
+            wait
+            ;;
+            
+        *)
+            echo "Unsupported task type \"$TASK_TYPE\"" >&2
+            exit 1
+            ;;
+    esac
 fi
