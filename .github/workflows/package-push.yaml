@@ -51,12 +51,22 @@ jobs:
         runs-on: ubuntu-latest
         needs: build-pkg
         steps:
-            - name: 'Download all release assets'
-              run: curl -s https://api.github.com/repos/engineer-man/piston/releases/latest | jq '.assets[].browser_download_url' -r | xargs -L 1 curl -sLO
+            - name: 'Download original repo index'
+              run: curl -s -L -o original_index https://github.com/engineer-man/piston/releases/download/pkgs/index || echo "No original index found, creating new one"
+            
+            - name: 'Download fork release assets'
+              run: curl -s https://api.github.com/repos/guipenedo/piston/releases/latest | jq '.assets[].browser_download_url' -r | xargs -L 1 curl -sLO
+            
             - name: 'Generate index file'
               run: |
-                  echo "" > index
-                  BASEURL=https://github.com/engineer-man/piston/releases/download/pkgs/
+                  # Start with original index if it exists
+                  if [ -s original_index ]; then
+                    cp original_index index
+                  else
+                    echo "" > index
+                  fi
+                  
+                  BASEURL=https://github.com/guipenedo/piston/releases/download/pkgs/
                   for pkg in *.pkg.tar.gz
                   do
                     PKGFILE=$(basename $pkg)
@@ -65,6 +75,13 @@ jobs:
                     PKGNAME=$(echo $PKGFILENAME | grep -oP '^\K.+(?=-)')
                     PKGVERSION=$(echo $PKGFILENAME | grep -oP '^.+-\K.+')
                     PKGCHECKSUM=$(sha256sum $PKGFILE | awk '{print $1}')
+                    
+                    # Check if package with same name AND version already exists in index
+                    if grep -q "^$PKGNAME,$PKGVERSION," index; then
+                      grep -v "^$PKGNAME,$PKGVERSION," index > index.tmp
+                      mv index.tmp index
+                    fi
+                    
                     echo "$PKGNAME,$PKGVERSION,$PKGCHECKSUM,$BASEURL$PKGFILE" >> index
                     echo "Adding package $PKGNAME-$PKGVERSION"
                   done
