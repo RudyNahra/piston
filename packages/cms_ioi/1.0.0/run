@@ -12,8 +12,8 @@ else
         exit 1
     fi
     
-    # Read task type from grader_config.json
-    TASK_TYPE=$(jq -r '.task_type' graders/grader_config.json)
+    # Read task type from grader_config.json using grep and sed
+    TASK_TYPE=$(grep -o '"task_type":[^,}]*' graders/grader_config.json | sed 's/"task_type":\s*"\([^"]*\)"/\1/')
     case "$TASK_TYPE" in
         "Batch")
             # Run solution (original batch behavior)
@@ -21,33 +21,60 @@ else
             ;;
             
         "Communication")
-            # Read num_processes from config
-            NUM_PROCESSES=$(jq -r '.task_type_params.task_type_parameters_Communication_num_processes' graders/grader_config.json)
+            # Read num_processes using grep and sed
+            NUM_PROCESSES=$(grep -o '"task_type_parameters_Communication_num_processes":[^,}]*' graders/grader_config.json | sed 's/.*:\s*\([0-9]*\)/\1/')
             
-            # Create FIFOs for communication
-            FIFO_DIR=$(mktemp -d)
+            # Read user_io parameter from grader_config.json, default to "std_io" if not found
+            USER_IO=$(grep -o '"task_type_parameters_Communication_user_io":[^,}]*' graders/grader_config.json | sed 's/.*:\s*"\([^"]*\)"/\1/')
+            if [ -z "$USER_IO" ]; then
+                USER_IO="std_io"
+            fi
             
-            # Create FIFOs for each process
+            # Create temporary directories for FIFOs
+            FIFO_DIRS=()
             for i in $(seq 0 $((NUM_PROCESSES-1))); do
-                mkfifo "$FIFO_DIR/u${i}_to_m"
-                mkfifo "$FIFO_DIR/m_to_u${i}"
-                chmod 666 "$FIFO_DIR/u${i}_to_m" "$FIFO_DIR/m_to_u${i}"
+                FIFO_DIRS[$i]=$(mktemp -d)
+                
+                # Create FIFOs for this process
+                mkfifo "${FIFO_DIRS[$i]}/u${i}_to_m"
+                mkfifo "${FIFO_DIRS[$i]}/m_to_u${i}"
+                chmod 755 "${FIFO_DIRS[$i]}"
+                chmod 666 "${FIFO_DIRS[$i]}/u${i}_to_m" "${FIFO_DIRS[$i]}/m_to_u${i}"
             done
 
             # Start manager in background with all FIFOs as arguments
             MANAGER_ARGS=""
             for i in $(seq 0 $((NUM_PROCESSES-1))); do
-                MANAGER_ARGS="$MANAGER_ARGS $FIFO_DIR/u${i}_to_m $FIFO_DIR/m_to_u${i}"
+                MANAGER_ARGS="$MANAGER_ARGS ${FIFO_DIRS[$i]}/u${i}_to_m ${FIFO_DIRS[$i]}/m_to_u${i}"
             done
-            ./graders/manager $MANAGER_ARGS &
+            cat | ./graders/manager $MANAGER_ARGS &
             
             # Start all user processes
             for i in $(seq 0 $((NUM_PROCESSES-1))); do
-                ./"${@%.*}" "$FIFO_DIR/m_to_u${i}" "$FIFO_DIR/u${i}_to_m" "$i" &
+                if [ "$USER_IO" = "fifo_io" ]; then
+                    # Pass FIFOs as arguments
+                    ARGS="${FIFO_DIRS[$i]}/m_to_u${i} ${FIFO_DIRS[$i]}/u${i}_to_m"
+                    if [ "$NUM_PROCESSES" -ne 1 ]; then
+                        ARGS="$ARGS $i"
+                    fi
+                    ./"${@%.*}" $ARGS &
+                else
+                    # Use stdin/stdout redirection
+                    if [ "$NUM_PROCESSES" -ne 1 ]; then
+                        ./"${@%.*}" "$i" < "${FIFO_DIRS[$i]}/m_to_u${i}" > "${FIFO_DIRS[$i]}/u${i}_to_m" &
+                    else
+                        ./"${@%.*}" < "${FIFO_DIRS[$i]}/m_to_u${i}" > "${FIFO_DIRS[$i]}/u${i}_to_m" &
+                    fi
+                fi
             done
 
             # Wait for all processes to finish
             wait
+            
+            # Clean up FIFO directories
+            for i in $(seq 0 $((NUM_PROCESSES-1))); do
+                rm -rf "${FIFO_DIRS[$i]}"
+            done
             ;;
             
         *)
