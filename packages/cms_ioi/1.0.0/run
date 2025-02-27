@@ -16,8 +16,7 @@ else
     TASK_TYPE=$(grep -o '"task_type":[^,}]*' graders/grader_config.json | sed 's/"task_type":\s*"\([^"]*\)"/\1/')
     case "$TASK_TYPE" in
         "Batch")
-            # Run solution (original batch behavior)
-            ./"${@%.*}"
+            ./"${@%.*}" < input.txt
             ;;
             
         "Communication")
@@ -47,7 +46,8 @@ else
             for i in $(seq 0 $((NUM_PROCESSES-1))); do
                 MANAGER_ARGS="$MANAGER_ARGS ${FIFO_DIRS[$i]}/u${i}_to_m ${FIFO_DIRS[$i]}/m_to_u${i}"
             done
-            cat | ./graders/manager $MANAGER_ARGS &
+            # we don't actually want the user code to have access to the input file
+            { cat input.txt; rm input.txt; } | ./graders/manager $MANAGER_ARGS &
             
             # Start all user processes
             for i in $(seq 0 $((NUM_PROCESSES-1))); do
