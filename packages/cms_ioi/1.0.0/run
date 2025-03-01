@@ -83,3 +83,8 @@ else
             ;;
     esac
 fi
+
+# piston sometimes randomly truncates large outputs, which results in WA verdicts. this way we can check if the output is truncated and retry if needed
+if [ -e "STDOUT_END_MARKER" ]; then
+    cat "STDOUT_END_MARKER"
+fi
