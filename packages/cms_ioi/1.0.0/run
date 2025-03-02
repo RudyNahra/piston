@@ -20,6 +20,30 @@ else
             ;;
             
         "Communication")
+            # Create a PID file to track our child processes
+            PID_FILE=$(mktemp)
+            
+            # Define cleanup function for Communication tasks
+            cleanup() {
+                # Clean up FIFO directories if they exist
+                if [ -n "${FIFO_DIRS[*]}" ]; then
+                    for dir in "${FIFO_DIRS[@]}"; do
+                        [ -d "$dir" ] && rm -rf "$dir"
+                    done
+                fi
+                
+                # Kill only our child processes using the PID file
+                if [ -f "$PID_FILE" ]; then
+                    while read -r pid; do
+                        if kill -0 "$pid" 2>/dev/null; then
+                            kill "$pid" 2>/dev/null || kill -9 "$pid" 2>/dev/null || true
+                        fi
+                    done < "$PID_FILE"
+                    rm -f "$PID_FILE"
+                fi
+            }
+            trap cleanup EXIT INT TERM
+            
             # Read num_processes using grep and sed
             NUM_PROCESSES=$(grep -o '"task_type_parameters_Communication_num_processes":[^,}]*' graders/grader_config.json | sed 's/.*:\s*\([0-9]*\)/\1/')
             
@@ -48,6 +72,7 @@ else
             done
             # we don't actually want the user code to have access to the input file
             { cat input.txt; rm input.txt; } | ./graders/manager $MANAGER_ARGS &
+            echo $! >> "$PID_FILE"  # Record manager PID
             
             # Start all user processes
             for i in $(seq 0 $((NUM_PROCESSES-1))); do
@@ -58,12 +83,15 @@ else
                         ARGS="$ARGS $i"
                     fi
                     ./"${@%.*}" $ARGS &
+                    echo $! >> "$PID_FILE"  # Record process PID
                 else
                     # Use stdin/stdout redirection
                     if [ "$NUM_PROCESSES" -ne 1 ]; then
                         ./"${@%.*}" "$i" < "${FIFO_DIRS[$i]}/m_to_u${i}" > "${FIFO_DIRS[$i]}/u${i}_to_m" &
+                        echo $! >> "$PID_FILE"  # Record process PID
                     else
                         ./"${@%.*}" < "${FIFO_DIRS[$i]}/m_to_u${i}" > "${FIFO_DIRS[$i]}/u${i}_to_m" &
+                        echo $! >> "$PID_FILE"  # Record process PID
                     fi
                 fi
             done
@@ -71,10 +99,7 @@ else
             # Wait for all processes to finish
             wait
             
-            # Clean up FIFO directories
-            for i in $(seq 0 $((NUM_PROCESSES-1))); do
-                rm -rf "${FIFO_DIRS[$i]}"
-            done
+            # Clean up is now handled by the trap
             ;;
             
         *)
