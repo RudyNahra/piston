@@ -63,6 +63,10 @@ files_to_compile=("graders/$problem_name.cpp")
 [ -e graders/stub.cpp ] && files_to_compile+=("graders/stub.cpp")
 
 g++ -DEVAL -std=gnu++17 -O2 -pipe -s -o graders/"$problem_name" "${files_to_compile[@]}"
+if [ $? -ne 0 ]; then
+    echo "Failed to compile $problem_name" >&2
+    exit 1
+fi
 chmod +x graders/"$problem_name"
 echo "Compiled $problem_name from ${files_to_compile[@]} successfully"
 
