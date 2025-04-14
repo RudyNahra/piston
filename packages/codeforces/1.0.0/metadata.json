@@ -1,0 +1,54 @@
+{
+    "language": "codeforces",
+    "version": "1.0.0",
+    "provides": [
+        {
+            "language": "c++",
+            "aliases": ["GNU C++", "cf_c++"]
+        },
+        {
+            "language": "c++0x",
+            "aliases": ["GNU C++0x", "cf_c++0x"]
+        },
+        {
+            "language": "c++11",
+            "aliases": ["GNU C++11", "cf_c++11"]
+        },
+        {
+            "language": "c++14",
+            "aliases": ["C++14 (GCC 6-32)", "cf_c++14"]
+        },
+        {
+            "language": "c++17",
+            "aliases": ["C++17 (GCC 7-32)", "C++17 (GCC 9-64)", "cf_c++17-32", "cf_c++17-64"]
+        },
+        {
+            "language": "c++20",
+            "aliases": ["C++20 (GCC 11-64)", "C++20 (GCC 13-64)", "cf_c++20-11", "cf_c++20-13"]
+        },
+        {
+            "language": "msvc++",
+            "aliases": ["MS C++", "cf_msvc++"]
+        },
+        {
+            "language": "python3",
+            "aliases": ["Python 3", "cf_python3"]
+        },
+        {
+            "language": "pypy3",
+            "aliases": ["PyPy 3", "cf_pypy3"]
+        },
+        {
+            "language": "pypy3-64",
+            "aliases": ["PyPy 3-64", "cf_pypy3-64"]
+        },
+        {
+            "language": "kotlin",
+            "aliases": ["Kotlin 1.4", "cf_kotlin"]
+        },
+        {
+            "language": "qsharp",
+            "aliases": ["Q#", "cf_qsharp"]
+        }
+    ]
+}

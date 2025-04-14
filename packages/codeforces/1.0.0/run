@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+# disable stack limit so you don't get RE with recursion
+ulimit -s unlimited
+# some problems have 10MB+ input/output files in their test cases and you might get RE. uncomment if needed
+# ulimit -f 2097152
+
+# # Check if grader_config.json exists
+# if [ ! -f "graders/grader_config.json" ]; then
+#     echo "Error: graders/grader_config.json not found" >&2
+#     echo "Current directory contents:" >&2
+#     find . -type f -o -type d | sed -e 's/[^-][^\/]*\//  |/g' -e 's/|\([^ ]\)/|-\1/' >&2
+#     exit 1
+# fi
+
+source grader_config
+case "${PISTON_LANGUAGE}" in
+    python3)
+        TASK_EXECUTABLE="python3 $1"
+        ;;
+    kotlin)
+        # Assuming filename is always main.kt, the compiled class is MainKt
+        TASK_EXECUTABLE="kotlin MainKt"
+        ;;
+    *)
+        TASK_EXECUTABLE="./a.out"
+        ;;
+esac
+
+# # # Set memory limit in KB (convert from megabytes)
+if [ -n "$MEMORY_LIMIT" ]; then
+    # handle floats using awk
+    MEMORY_LIMIT_KB=$(awk "BEGIN {printf \"%.0f\", $MEMORY_LIMIT * 1024}")
+    # Set the memory limit for the entire script and all child processes
+    ulimit -v $MEMORY_LIMIT_KB  # Virtual memory
+    ulimit -m $MEMORY_LIMIT_KB  # Resident set size
+    ulimit -d $MEMORY_LIMIT_KB  # Data segment size
+    ulimit -s $MEMORY_LIMIT_KB  # Stack size
+fi
+
+# "Securely" handle the correct output file
+CORRECT_OUTPUT=""
+if [ -f "correct_output.txt" ]; then
+    # Read the content and immediately remove the file
+    CORRECT_OUTPUT=$(cat correct_output.txt)
+    rm -f correct_output.txt
+fi
+
+# Create a temporary file for solution output
+SOLUTION_OUTPUT=$(mktemp)
+
+# Global variables for process tracking
+declare -a ALL_PIDS
+
+# Define cleanup function - simplified assuming timeout exists
+function cleanup {
+    # Kill all tracked processes silently
+    exec 2>/dev/null
+    for pid in "${ALL_PIDS[@]:-}"; do
+        kill -9 "$pid" 2>/dev/null || true
+    done
+    
+    # Clean up temporary files
+    rm -f "$SOLUTION_OUTPUT" || true
+    exec 2>&2
+}
+
+# Set up signal handling
+trap cleanup EXIT INT TERM
+
+# Function to handle exit codes consistently across task types
+function handle_exit_code {
+    local exit_code=$1
+    
+    # Check for known timeout exit codes:
+    # - 124: standard timeout exit code
+    # - 137: SIGKILL (128+9), used for hard timeouts
+    # - 143: SIGTERM (128+15), can also be used for timeouts
+    if [ $exit_code -eq 124 ] || [ $exit_code -eq 137 ] || [ $exit_code -eq 143 ]; then
+        echo "0"
+        echo "Time limit exceeded (${TIME_LIMIT}s)" >&2
+        return 124
+    elif [ $exit_code -eq 134 ]; then
+        echo "0"
+        echo "Memory limit exceeded (${MEMORY_LIMIT}MB)" >&2
+        return 134
+    # All other non-zero exit codes should be treated as runtime errors
+    elif [ $exit_code -ne 0 ]; then
+        echo "0"
+        echo "Runtime error with exit code $exit_code" >&2
+        return $exit_code
+    fi
+    
+    # Success case - return 0
+    return 0
+}
+
+# Function to run a command with timeout (simplified assuming timeout exists)
+function run_with_timeout {
+    local soft_limit=$1; shift
+    
+    timeout --preserve-status "$soft_limit" "$@"
+    return $?
+}
+
+# Normalize input file to Unix line endings (remove \r)
+sed -i 's/\r$//' input.txt
+
+# Simple batch execution with timeout
+# If TIME_LIMIT is not set, just run the command directly
+if [ -z "$TIME_LIMIT" ]; then
+    $TASK_EXECUTABLE < input.txt > "$SOLUTION_OUTPUT"
+else
+    run_with_timeout "$TIME_LIMIT" $TASK_EXECUTABLE < input.txt > "$SOLUTION_OUTPUT"
+fi
+exit_code=$?
+
+# Handle non-zero exit codes
+handle_exit_code $exit_code
+if [ $? -ne 0 ]; then
+    exit $?
+fi
+
+# Check the output if we have a correct output
+if [ -n "$CORRECT_OUTPUT" ]; then
+    # Restore the correct output file
+    echo "$CORRECT_OUTPUT" > correct_output.txt
+    
+    # Check if there's a custom checker
+    if [ -f "checker/checker" ]; then
+        # Let the checker handle everything
+        ./checker/checker input.txt correct_output.txt "$SOLUTION_OUTPUT"
+        exit $?
+    else
+        # Simple diff-based checking
+        # if diff -bq <(echo "$CORRECT_OUTPUT") "$SOLUTION_OUTPUT" >/dev/null; then
+        if diff -b correct_output.txt "$SOLUTION_OUTPUT" >&2; then
+            echo "1"
+            echo "Output is correct (diff)" >&2
+        else
+            echo "0"
+            echo "Output isn't correct (diff)" >&2
+        fi
+    fi
+else
+    # If no correct output was provided, just output the solution's output
+    cat "$SOLUTION_OUTPUT"
+fi
+
