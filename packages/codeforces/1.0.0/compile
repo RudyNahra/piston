@@ -28,33 +28,23 @@ case "${PISTON_LANGUAGE}" in
         # C++20 (GCC 11-64 and GCC 13-64)
         g++ -Wall -Wextra -Wconversion -DONLINE_JUDGE -O2 -std=c++20 -pipe -s $1
         ;;
-    msvc++)
-        # MS C++
-        cl /W4 /F268435456 /EHsc /O2 /DONLINE_JUDGE $1
-        ;;
     python3)
         # Python 3
         echo "Skipping compile - python3"
         exit 0
         ;;
-    pypy3)
-        # PyPy 3
-        echo "Skipping compile - pypy3"
-        exit 0
-        ;;
-    pypy3-64)
-        # PyPy 3-64
-        echo "Skipping compile - pypy3-64"
-        exit 0
-        ;;
     kotlin)
         # Kotlin 1.4
-        kotlinc $1
+        kotlinc $1 -include-runtime -d main.jar
         ;;
-    qsharp)
-        # Q#
-        echo "Q# compilation not implemented"
-        exit 1
+    java)
+        main_class=$(grep -m 1 -E "^[^/]*public (final|abstract)? *class" main.java | sed -E 's/.*class +([A-Za-z0-9_]+).*/\1/')
+        echo "Found main class: $main_class"
+        echo "Renaming main.java to $main_class.java"
+        mv main.java $main_class.java
+        echo "Compiling $main_class.java"
+        # Java
+        javac -Xlint:unchecked $main_class.java
         ;;
     *)
         echo "Unsupported language: ${PISTON_LANGUAGE}"

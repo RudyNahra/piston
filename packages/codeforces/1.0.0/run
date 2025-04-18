@@ -4,49 +4,69 @@ ulimit -s unlimited
 # some problems have 10MB+ input/output files in their test cases and you might get RE. uncomment if needed
 # ulimit -f 2097152
 
-# # Check if grader_config.json exists
-# if [ ! -f "graders/grader_config.json" ]; then
-#     echo "Error: graders/grader_config.json not found" >&2
-#     echo "Current directory contents:" >&2
-#     find . -type f -o -type d | sed -e 's/[^-][^\/]*\//  |/g' -e 's/|\([^ ]\)/|-\1/' >&2
-#     exit 1
-# fi
+INPUT_MODE="stdio"
+if [ -f "grader_config" ]; then
+    source grader_config
+fi
 
-source grader_config
+# Initialize JVM memory options string
+JVM_MEMORY_OPTS=""
+if [ -n "$MEMORY_LIMIT" ]; then
+    # Ensure MEMORY_LIMIT is an integer for JVM flags
+    MEMORY_LIMIT_MB=$(printf "%.0f" "$MEMORY_LIMIT")
+    JVM_MEMORY_OPTS="-Xmx${MEMORY_LIMIT_MB}M"
+
+    # Set memory limit using ulimit only for non-JVM languages
+    if [ "${PISTON_LANGUAGE}" != "java" ] && [ "${PISTON_LANGUAGE}" != "kotlin" ]; then
+        # handle floats using awk
+        MEMORY_LIMIT_KB=$(awk "BEGIN {printf \"%.0f\", $MEMORY_LIMIT * 1024}")
+        # Set the memory limit for the entire script and all child processes
+        ulimit -v $MEMORY_LIMIT_KB  # Virtual memory
+        ulimit -m $MEMORY_LIMIT_KB  # Resident set size
+        ulimit -d $MEMORY_LIMIT_KB  # Data segment size
+    fi
+fi
+
 case "${PISTON_LANGUAGE}" in
     python3)
         TASK_EXECUTABLE="python3 $1"
         ;;
     kotlin)
-        # Assuming filename is always main.kt, the compiled class is MainKt
-        TASK_EXECUTABLE="kotlin MainKt"
+        TASK_EXECUTABLE="java -XX:NewRatio=5 -Xms8M -Xss64M $JVM_MEMORY_OPTS -DONLINE_JUDGE=true -Duser.language=en -Duser.region=US -Duser.variant=US -jar main.jar"
+        ;;
+    java)
+        main_class=$(ls *.java 2>/dev/null | head -n 1 | sed 's/\.java$//')
+        TASK_EXECUTABLE="java -XX:NewRatio=5 -Xms8M -Xss64M $JVM_MEMORY_OPTS -DONLINE_JUDGE=true -Duser.language=en -Duser.region=US -Duser.variant=US $main_class"
         ;;
     *)
         TASK_EXECUTABLE="./a.out"
         ;;
 esac
 
-# # # Set memory limit in KB (convert from megabytes)
-if [ -n "$MEMORY_LIMIT" ]; then
-    # handle floats using awk
-    MEMORY_LIMIT_KB=$(awk "BEGIN {printf \"%.0f\", $MEMORY_LIMIT * 1024}")
-    # Set the memory limit for the entire script and all child processes
-    ulimit -v $MEMORY_LIMIT_KB  # Virtual memory
-    ulimit -m $MEMORY_LIMIT_KB  # Resident set size
-    ulimit -d $MEMORY_LIMIT_KB  # Data segment size
-    ulimit -s $MEMORY_LIMIT_KB  # Stack size
-fi
+# Choose a very unlikely string
+SENTINEL="__NO_CORRECT_OUTPUT__"
 
 # "Securely" handle the correct output file
-CORRECT_OUTPUT=""
+CORRECT_OUTPUT="$SENTINEL"
 if [ -f "correct_output.txt" ]; then
     # Read the content and immediately remove the file
     CORRECT_OUTPUT=$(cat correct_output.txt)
     rm -f correct_output.txt
 fi
 
-# Create a temporary file for solution output
-SOLUTION_OUTPUT=$(mktemp)
+
+# some (old) problems ask the contestants to read from input.txt and write to output.txt directly
+if [ "$INPUT_MODE" == "file" ]; then
+    SOLUTION_OUTPUT="output.txt"
+    SOLUTION_INPUT="input.txt"
+else
+    # Create a temporary file for solution output
+    SOLUTION_OUTPUT=$(mktemp)
+    SOLUTION_INPUT=$(mktemp)
+
+    # some solutions will read input.txt for local testing... so we need to rename it
+    mv input.txt "$SOLUTION_INPUT"
+fi
 
 # Global variables for process tracking
 declare -a ALL_PIDS
@@ -61,6 +81,7 @@ function cleanup {
     
     # Clean up temporary files
     rm -f "$SOLUTION_OUTPUT" || true
+    rm -f "$SOLUTION_INPUT" || true
     exec 2>&2
 }
 
@@ -102,38 +123,65 @@ function run_with_timeout {
     return $?
 }
 
+# Function to normalize checker output
+# 1. Uppercase whole words "yes"/"no" (case-insensitive)
+# 2. Normalize all whitespace sequences to single spaces on one line
+function normalize_output {
+    local filename="$1"
+    # 1. Use sed line-by-line for case-insensitive yes/no replacement (GNU extensions: -E for extended regex, \b for word boundary, i for case-insensitive)
+    # 2. Use tr to replace newlines with spaces 
+    # 3. Use tr again to squeeze all resulting whitespace sequences into single spaces
+    # 4. Use sed to trim leading/trailing space from the final single line
+    <"$filename" sed -E 's/\b(yes)\b/YES/ig; s/\b(no)\b/NO/ig' | tr '\n' ' ' | tr -s '[:space:]' ' ' | sed 's/^ //;s/ $//'
+}
+
 # Normalize input file to Unix line endings (remove \r)
-sed -i 's/\r$//' input.txt
+sed -i 's/\r$//' "$SOLUTION_INPUT"
+
 
 # Simple batch execution with timeout
 # If TIME_LIMIT is not set, just run the command directly
 if [ -z "$TIME_LIMIT" ]; then
-    $TASK_EXECUTABLE < input.txt > "$SOLUTION_OUTPUT"
+    if [ "$INPUT_MODE" == "file" ]; then
+        $TASK_EXECUTABLE > /dev/null 2>&1
+    else
+        # stdio, pipe
+        $TASK_EXECUTABLE < "$SOLUTION_INPUT" > "$SOLUTION_OUTPUT"
+    fi
 else
-    run_with_timeout "$TIME_LIMIT" $TASK_EXECUTABLE < input.txt > "$SOLUTION_OUTPUT"
+    if [ "$INPUT_MODE" == "file" ]; then
+        run_with_timeout "$TIME_LIMIT" $TASK_EXECUTABLE > /dev/null 2>&1
+    else
+        # stdio, pipe
+        run_with_timeout "$TIME_LIMIT" $TASK_EXECUTABLE < "$SOLUTION_INPUT" > "$SOLUTION_OUTPUT"
+    fi
 fi
 exit_code=$?
 
 # Handle non-zero exit codes
 handle_exit_code $exit_code
-if [ $? -ne 0 ]; then
-    exit $?
+rc=$?
+if [ $rc -ne 0 ]; then
+    exit $rc
 fi
 
-# Check the output if we have a correct output
-if [ -n "$CORRECT_OUTPUT" ]; then
-    # Restore the correct output file
+# Check if the variable is still the sentinel value
+if [ "$CORRECT_OUTPUT" != "$SENTINEL" ]; then
+    # The file existed (and CORRECT_OUTPUT holds its content, possibly "")
     echo "$CORRECT_OUTPUT" > correct_output.txt
+    sed -i 's/\r$//' correct_output.txt  # dumb \r from codeforces
     
     # Check if there's a custom checker
     if [ -f "checker/checker" ]; then
         # Let the checker handle everything
-        ./checker/checker input.txt correct_output.txt "$SOLUTION_OUTPUT"
+        ./checker/checker "$SOLUTION_INPUT" correct_output.txt "$SOLUTION_OUTPUT"
         exit $?
     else
         # Simple diff-based checking
-        # if diff -bq <(echo "$CORRECT_OUTPUT") "$SOLUTION_OUTPUT" >/dev/null; then
-        if diff -b correct_output.txt "$SOLUTION_OUTPUT" >&2; then
+        # Use cat | xargs to normalize all whitespace to single spaces on one line.
+        # diff -b handles potential leading/trailing space differences.
+        # add -q to suppress output
+        if diff -bq <(normalize_output correct_output.txt) <(normalize_output "$SOLUTION_OUTPUT") >&2; then
             echo "1"
             echo "Output is correct (diff)" >&2
         else
