@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Put instructions to build your package in here
-# [[ -d "bin" ]] && exit 0
+[[ -d "bin" ]] && exit 0
 PREFIX=$(realpath $(dirname $0))
 
 
@@ -44,6 +44,16 @@ make -j$(nproc)
 make install -j$(nproc)
 cd ../
 rm -rf build obj
+
+# === Install OpenJDK 11 ===
+# Download and install OpenJDK 11
+OPENJDK_VERSION="11.0.2"
+OPENJDK_BUILD="9"
+OPENJDK_URL="https://download.java.net/java/GA/jdk11/${OPENJDK_BUILD}/GPL/openjdk-${OPENJDK_VERSION}_linux-x64_bin.tar.gz"
+curl "${OPENJDK_URL}" -o java.tar.gz
+
+tar xzf java.tar.gz --strip-components=1
+rm java.tar.gz
 
 # === Install Kotlin ===
 mkdir kotlin_install

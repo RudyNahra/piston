@@ -165,17 +165,35 @@ if [ $rc -ne 0 ]; then
     exit $rc
 fi
 
+# remove empty newlines
+sed -i '/^$/d' "$SOLUTION_OUTPUT"
 # Check if the variable is still the sentinel value
 if [ "$CORRECT_OUTPUT" != "$SENTINEL" ]; then
     # The file existed (and CORRECT_OUTPUT holds its content, possibly "")
     echo "$CORRECT_OUTPUT" > correct_output.txt
     sed -i 's/\r$//' correct_output.txt  # dumb \r from codeforces
+
+    # Remove all empty lines (lines containing only whitespace don't count as empty here).
+    # The pattern /^$/ matches lines that start (^) and immediately end ($), meaning they are empty.
+    # The 'd' command deletes these matched lines. The -i flag modifies the file in-place.
+    # This effectively removes blank lines resulting from consecutive newlines (\n\n becomes \n after removing the empty line between them).
+    sed -i '/^$/d' correct_output.txt
     
     # Check if there's a custom checker
-    if [ -f "checker/checker" ]; then
-        # Let the checker handle everything
-        ./checker/checker "$SOLUTION_INPUT" correct_output.txt "$SOLUTION_OUTPUT"
-        exit $?
+    if [ -f "checker.py" ]; then
+        # Let the checker handle everything and capture stdout
+        result=$(run_with_timeout 10 python3 checker.py "$SOLUTION_INPUT" correct_output.txt "$SOLUTION_OUTPUT")
+        exit_code=$?
+        # Trim whitespace and check result
+        result=$(echo "$result" | tr -d '[:space:]')
+        if [ "$result" = "100" ] || [ "$result" = "1" ]; then
+            echo "1"
+            echo "Output is correct (checker)" >&2
+        else
+            echo "0"
+            echo "Output isn't correct (checker)" >&2
+        fi
+        exit $exit_code
     else
         # Simple diff-based checking
         # Use cat | xargs to normalize all whitespace to single spaces on one line.
